@@ -88,10 +88,30 @@ export function useWebSocket() {
               break;
             case 'menu_created':
             case 'menu_updated':
+            case 'menu_synced':
               queryClient.invalidateQueries({ queryKey: ['/api/menu'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/menu/categories'] });
+              break;
+            case 'floor_created':
+            case 'floor_updated':
+            case 'floor_deleted':
+              queryClient.invalidateQueries({ queryKey: ['/api/floors'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/tables'] });
+              break;
+            case 'invoice_created':
+            case 'invoice_updated':
+            case 'invoice_deleted':
+              queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+              break;
+            case 'inventory_updated':
+              queryClient.invalidateQueries({ queryKey: ['/api/inventory'] });
+              break;
+            case 'kot_created':
+              queryClient.invalidateQueries({ queryKey: ['/api/orders/active'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/orders/completed'] });
               break;
             default:
-              console.log('[WebSocket] Unknown message type:', message.type);
+              break;
           }
         } catch (error) {
           console.error('[WebSocket] Failed to parse message:', error);
@@ -106,7 +126,7 @@ export function useWebSocket() {
         console.log('[WebSocket] Disconnected');
         if (isMountedRef.current) {
           console.log('[WebSocket] Reconnecting in 3s...');
-          reconnectTimeoutRef.current = setTimeout(connect, 3000);
+          reconnectTimeoutRef.current = setTimeout(connect, 1000);
         }
       };
     };
