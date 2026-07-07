@@ -61,125 +61,124 @@ function KOTViewModal({
   if (!ticket) return null;
   const createdAt = new Date(ticket.order.createdAt);
   const st = getStatus(ticket.order, ticket.items);
-  const total = ticket.items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+  const totalQty = ticket.items.reduce((s, i) => s + i.quantity, 0);
+  const totalAmt = ticket.items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+
+  const typeLabel =
+    ticket.order.orderType === "dine-in"  ? "Dine-In"  :
+    ticket.order.orderType === "delivery" ? "Delivery" : "Pickup";
+
+  /* Rows: [label, value, valueClass?] */
+  const metaRows: [string, React.ReactNode][] = [
+    ["KOT No",     <span className="font-bold">{ticket.kotNumber}</span>],
+    ["Order Date", format(createdAt, "dd/MM/yyyy, hh:mm a")],
+    ["Type",       typeLabel],
+    ...(ticket.order.orderType === "dine-in" ? [
+      ["Table", ticket.tableNumber] as [string, React.ReactNode],
+      ...(ticket.floorName ? [["Floor", ticket.floorName] as [string, React.ReactNode]] : []),
+    ] : []),
+    ...(ticket.order.customerName  ? [["Customer", ticket.order.customerName]  as [string, React.ReactNode]] : []),
+    ...(ticket.order.customerPhone ? [["Phone",    ticket.order.customerPhone]  as [string, React.ReactNode]] : []),
+    ["Status", (
+      <span className={cn("px-2 py-0.5 rounded text-xs font-semibold", st.bg, st.text)}>
+        {st.label}
+      </span>
+    )],
+  ];
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden">
-        {/* Header tabs row */}
-        <div className="flex border-b">
-          <div className="px-4 py-2.5 text-sm text-gray-500 border-r">Customer Invoice</div>
-          <div className="px-4 py-2.5 text-sm font-semibold bg-gray-900 text-white">KOT</div>
+      <DialogContent className="max-w-[420px] p-0 overflow-hidden rounded-xl shadow-xl">
+
+        {/* ── Tab header ── */}
+        <div className="flex border-b select-none">
+          <div className="px-5 py-3 text-sm text-gray-400 border-r border-gray-200 bg-gray-50">
+            Customer Invoice
+          </div>
+          <div className="px-5 py-3 text-sm font-bold bg-gray-900 text-white tracking-wide">
+            KOT
+          </div>
+          {/* push close button to right edge */}
+          <div className="flex-1" />
         </div>
 
-        {/* Ticket body */}
-        <div className="px-6 py-5 font-mono text-sm space-y-4">
-          {/* Restaurant branding */}
-          <div className="text-center space-y-0.5">
-            <p className="text-base font-bold tracking-wide uppercase">Restaurant POS</p>
-            <p className="text-xs text-gray-500">Kitchen Order Ticket</p>
+        {/* ── Body ── */}
+        <div className="px-6 py-5 space-y-5 text-sm">
+
+          {/* Branding */}
+          <div className="text-center pb-1">
+            <p className="text-base font-extrabold tracking-widest uppercase text-gray-900">
+              Restaurant POS
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5 tracking-wide">Kitchen Order Ticket</p>
           </div>
 
-          <div className="border-t border-dashed" />
-
-          {/* KOT meta */}
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">KOT No</span>
-              <span className="font-bold">{ticket.kotNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Order Date</span>
-              <span>{format(createdAt, "dd/MM/yyyy, hh:mm a")}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Type</span>
-              <span className="capitalize">{ticket.order.orderType}</span>
-            </div>
-            {ticket.order.orderType === "dine-in" && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Table</span>
-                  <span>{ticket.tableNumber}</span>
-                </div>
-                {ticket.floorName && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Floor</span>
-                    <span>{ticket.floorName}</span>
-                  </div>
-                )}
-              </>
-            )}
-            {ticket.order.customerName && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Customer</span>
-                <span>{ticket.order.customerName}</span>
-              </div>
-            )}
-            {ticket.order.customerPhone && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Phone</span>
-                <span>{ticket.order.customerPhone}</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500">Status</span>
-              <span className={cn("px-2 py-0.5 rounded text-xs font-medium", st.bg, st.text)}>{st.label}</span>
-            </div>
-          </div>
-
-          <div className="border-t border-dashed" />
-
-          {/* Items table */}
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-1 font-semibold text-gray-600">Item</th>
-                <th className="text-right py-1 font-semibold text-gray-600">Qty</th>
-              </tr>
-            </thead>
+          {/* ── Meta table ── */}
+          <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden" style={{ borderCollapse: "collapse" }}>
             <tbody>
-              {ticket.items.map(item => (
-                <tr key={item.id} className="border-b border-dashed last:border-0">
-                  <td className="py-1.5 pr-2">
-                    <div className="flex items-start gap-1.5">
-                      <VegDot isVeg={item.isVeg} />
-                      <span>{item.name}</span>
-                    </div>
-                    {item.notes && <p className="text-gray-400 italic pl-4.5 mt-0.5">{item.notes}</p>}
-                  </td>
-                  <td className="text-right py-1.5 font-bold">{item.quantity}</td>
+              {metaRows.map(([label, value], idx) => (
+                <tr key={idx} className={idx < metaRows.length - 1 ? "border-b border-gray-100" : ""}>
+                  <td className="py-2 px-3 text-gray-500 font-medium w-28 bg-gray-50">{label}</td>
+                  <td className="py-2 px-3 text-gray-800 text-right">{value}</td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr>
-                <td className="pt-2 text-gray-500">Total Items:</td>
-                <td className="pt-2 text-right font-bold">
-                  {ticket.items.reduce((s, i) => s + i.quantity, 0)}
-                </td>
-              </tr>
-            </tfoot>
           </table>
 
-          {total > 0 && (
-            <>
-              <div className="border-t border-dashed" />
-              <div className="flex justify-between text-xs font-bold">
-                <span>Total Amount</span>
-                <span>₹{total.toFixed(2)}</span>
-              </div>
-            </>
-          )}
+          {/* ── Items table ── */}
+          <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden" style={{ borderCollapse: "collapse" }}>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="py-2 px-3 text-left font-semibold text-gray-600 w-8">#</th>
+                <th className="py-2 px-3 text-left font-semibold text-gray-600">Item</th>
+                <th className="py-2 px-3 text-right font-semibold text-gray-600 w-12">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ticket.items.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-4 text-center text-gray-400 italic">No items</td>
+                </tr>
+              ) : (
+                ticket.items.map((item, idx) => (
+                  <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2 px-3 text-gray-400">{idx + 1}</td>
+                    <td className="py-2 px-3">
+                      <div className="flex items-start gap-1.5">
+                        <VegDot isVeg={item.isVeg} />
+                        <span className="text-gray-800">{item.name}</span>
+                      </div>
+                      {item.notes && (
+                        <p className="text-gray-400 italic ml-4 mt-0.5">{item.notes}</p>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-right font-bold text-gray-800">{item.quantity}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-gray-200 bg-gray-50">
+                <td colSpan={2} className="py-2 px-3 font-semibold text-gray-600">Total Items :</td>
+                <td className="py-2 px-3 text-right font-bold text-gray-800">{totalQty}</td>
+              </tr>
+              {totalAmt > 0 && (
+                <tr className="border-t border-gray-200">
+                  <td colSpan={2} className="py-2 px-3 font-semibold text-gray-600 bg-gray-50">Total Amount :</td>
+                  <td className="py-2 px-3 text-right font-bold text-gray-800">₹{totalAmt.toFixed(2)}</td>
+                </tr>
+              )}
+            </tfoot>
+          </table>
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="px-6 py-3 border-t bg-gray-50 gap-2">
+        {/* ── Footer ── */}
+        <div className="px-6 py-3 border-t bg-gray-50 flex justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
           <Button size="sm" className="bg-gray-900 hover:bg-gray-800 text-white gap-1.5" onClick={onPrint}>
             <Printer className="h-3.5 w-3.5" /> Print KOT
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -254,8 +253,14 @@ function KOTEditModal({
   };
 
   const handleDeleteItem = async (itemId: string) => {
+    const snapshot = localItems;
     setLocalItems(prev => prev.filter(i => i.id !== itemId));
-    await deleteItemMutation.mutateAsync(itemId);
+    try {
+      await deleteItemMutation.mutateAsync(itemId);
+    } catch {
+      setLocalItems(snapshot); // rollback
+      toast({ title: "Failed to remove item", variant: "destructive" });
+    }
   };
 
   const handleAddMenuItem = async (mi: MenuItem) => {
