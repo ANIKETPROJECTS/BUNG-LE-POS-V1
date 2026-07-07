@@ -41,7 +41,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 export function setupAuthRoutes(app: any) {
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'restaurant-pos-secret-key-change-in-production',
+    secret: process.env.SESSION_SECRET || (() => { throw new Error('SESSION_SECRET environment variable is required'); })(),
     resave: false,
     saveUninitialized: false,
     cookie: {

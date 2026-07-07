@@ -4,16 +4,7 @@
     "name": "Default Restaurant",
     "username": "admin",
     "password": "admin123",
-    "mongodbUri": "mongodb+srv://raneaniket23_db_user:OI5H11tRz7h2ZUNF@pos.kk3ptmo.mongodb.net/?appName=POS",
-    "isActive": true,
-    "createdAt": "2024-12-13T00:00:00.000Z"
-  },
-  {
-    "id": "second-restaurant",
-    "name": "Second Restaurant",
-    "username": "admin2",
-    "password": "admin123",
-    "mongodbUri": "mongodb+srv://raneaniket23_db_user:lnSqaO2SgrMO0qNk@pos.aw8bsmt.mongodb.net/?appName=POS",
+    "mongodbUri": "CURRENT_MONGODB_URI",
     "isActive": true,
     "createdAt": "2024-12-13T00:00:00.000Z"
   }
