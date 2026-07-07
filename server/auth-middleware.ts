@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import { validateCredentials, getAccountById, loginSchema, type RestaurantAccount } from './auth';
 import { SessionStorage } from './session-storage';
 import { IStorage } from './storage';
@@ -39,15 +40,26 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+const REMEMBER_ME_AGE = 30 * 24 * 60 * 60 * 1000;  // 30 days
+
 export function setupAuthRoutes(app: any) {
+  const mongoUri = process.env.MONGODB_URI;
+  if (!mongoUri) throw new Error('MONGODB_URI environment variable is required');
+
   app.use(session({
     secret: process.env.SESSION_SECRET || (() => { throw new Error('SESSION_SECRET environment variable is required'); })(),
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: mongoUri,
+      dbName: 'restaurant_pos',
+      collectionName: 'sessions',
+      ttl: REMEMBER_ME_AGE / 1000,   // max TTL in seconds; per-session cookie handles the client side
+    }),
     cookie: {
       secure: false,
       httpOnly: true,
-      maxAge: 365 * 24 * 60 * 60 * 1000,
+      // No maxAge here — we set it per-login based on rememberMe
     },
   }));
 
@@ -59,6 +71,7 @@ export function setupAuthRoutes(app: any) {
       }
 
       const { username, password } = result.data;
+      const rememberMe = req.body.rememberMe === true;
       const account = validateCredentials(username, password);
 
       if (!account) {
@@ -82,6 +95,11 @@ export function setupAuthRoutes(app: any) {
       req.session.mongodbUri = account.mongodbUri;
       req.session.username = account.username;
       req.session.isAuthenticated = true;
+
+      // Extend cookie lifetime only when "Remember me" is checked
+      if (rememberMe) {
+        req.session.cookie.maxAge = REMEMBER_ME_AGE;
+      }
 
       storageCache.set(account.id, storage);
 

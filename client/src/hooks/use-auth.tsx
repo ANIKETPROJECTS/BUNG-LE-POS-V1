@@ -11,7 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   restaurant: Restaurant | null;
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string; code?: string }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
 }
@@ -51,13 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string; code?: string }> => {
+  const login = async (username: string, password: string, rememberMe = false): Promise<{ success: boolean; error?: string; code?: string }> => {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, rememberMe }),
       });
 
       const data = await response.json();
