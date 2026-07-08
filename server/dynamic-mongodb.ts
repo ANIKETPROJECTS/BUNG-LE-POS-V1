@@ -96,6 +96,22 @@ class DynamicMongoDBManager {
     }
   }
 
+  /**
+   * Reads a settings document from any established restaurant connection.
+   * Used by background services that run without a request context.
+   */
+  async getSettingFromAnyConnection(key: string): Promise<string | undefined> {
+    for (const [, info] of this.connections.entries()) {
+      try {
+        const doc = await info.db.collection<{ key: string; value: string }>('settings').findOne({ key } as any);
+        if (doc?.value) return doc.value;
+      } catch {
+        // ignore per-connection errors and try the next one
+      }
+    }
+    return undefined;
+  }
+
   async closeAll(): Promise<void> {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);

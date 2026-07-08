@@ -27,6 +27,7 @@
 
 import { MongoClient, Db } from "mongodb";
 import type { IStorage } from "./storage";
+import { dynamicMongoDB } from "./dynamic-mongodb";
 
 const EXTERNAL_DB_NAME = "Orders";
 const EXTERNAL_COLL    = "orders";
@@ -35,6 +36,7 @@ export class ExternalOrdersSyncService {
   private storage: IStorage;
   private client: MongoClient | null = null;
   private db: Db | null = null;
+  private currentUri: string | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private processedIds = new Set<string>();
   private isRunning = false;
@@ -55,8 +57,10 @@ export class ExternalOrdersSyncService {
     this.isRunning = true;
 
     console.log("🔄 [ExternalOrders] Starting external orders sync service...");
-    await this.connect();
-    await this.loadAlreadySynced();
+    // connect() also calls loadAlreadySynced() on first/reconnect
+    await this.connect().catch(err =>
+      console.warn("⚠️ [ExternalOrders] Initial connect failed (will retry):", err.message)
+    );
     await this.sync();
 
     this.syncInterval = setInterval(() => this.sync(), intervalMs);
@@ -78,19 +82,53 @@ export class ExternalOrdersSyncService {
 
   /* ── internal helpers ───────────────────────────────────────────── */
 
+  /**
+   * Resolve which MongoDB URI to use for the external orders database.
+   *
+   * Priority:
+   *  1. "mongodb_uri" key in the restaurant's settings collection
+   *     (saved via Menu Management → ⋮ → Database URI in the POS UI).
+   *     This lives inside the restaurant's own dynamicMongoDB connection which
+   *     is established when any user logs in.
+   *  2. DIGITAL_MENU_MONGODB_URI env/secret (explicit Replit secret override).
+   *  3. MONGODB_URI env fallback (works when both apps share one Atlas cluster).
+   */
+  private async resolveUri(): Promise<{ uri: string; source: string }> {
+    const settingUri = await dynamicMongoDB
+      .getSettingFromAnyConnection("mongodb_uri")
+      .catch(() => undefined);
+
+    if (settingUri) return { uri: settingUri, source: "POS Database URI setting" };
+    if (process.env.DIGITAL_MENU_MONGODB_URI)
+      return { uri: process.env.DIGITAL_MENU_MONGODB_URI, source: "DIGITAL_MENU_MONGODB_URI env" };
+    if (process.env.MONGODB_URI)
+      return { uri: process.env.MONGODB_URI, source: "MONGODB_URI (fallback)" };
+
+    throw new Error("No MongoDB URI available — set it via Menu Management → ⋮ → Database URI");
+  }
+
   private async connect(): Promise<void> {
-    if (this.client) return;
-    // Use the digital menu cluster URI if set separately; otherwise fall back to
-    // MONGODB_URI (works when both apps share the same Atlas cluster).
-    const uri = process.env.DIGITAL_MENU_MONGODB_URI || process.env.MONGODB_URI;
-    if (!uri) throw new Error("Neither DIGITAL_MENU_MONGODB_URI nor MONGODB_URI is set");
-    const usingKey = process.env.DIGITAL_MENU_MONGODB_URI
-      ? "DIGITAL_MENU_MONGODB_URI"
-      : "MONGODB_URI (fallback)";
+    const { uri, source } = await this.resolveUri();
+
+    // No-op if already connected to the same URI
+    if (this.client && this.currentUri === uri) return;
+
+    // URI changed (or first connection) — close old client if any
+    if (this.client) {
+      console.log("🔄 [ExternalOrders] URI changed — reconnecting...");
+      await this.client.close().catch(() => {});
+      this.client = null;
+      this.db = null;
+    }
+
+    this.currentUri = uri;
     this.client = new MongoClient(uri);
     await this.client.connect();
     this.db = this.client.db(EXTERNAL_DB_NAME);
-    console.log(`✅ [ExternalOrders] Connected to "${EXTERNAL_DB_NAME}" database (via ${usingKey})`);
+    console.log(`✅ [ExternalOrders] Connected to "${EXTERNAL_DB_NAME}" database (via ${source})`);
+
+    // Reload already-synced set whenever we (re)connect
+    await this.loadAlreadySynced();
   }
 
   private collection() {
@@ -114,6 +152,11 @@ export class ExternalOrdersSyncService {
   /** Main poll cycle */
   async sync(): Promise<number> {
     try {
+      // Re-resolve URI on every cycle — handles the case where a user logs in
+      // after server startup and the restaurant's mongodb_uri setting becomes
+      // available for the first time (or changes).
+      await this.connect();
+
       const coll = this.collection();
 
       // Accept ALL non-synced orders except terminal cancellations/rejections.
