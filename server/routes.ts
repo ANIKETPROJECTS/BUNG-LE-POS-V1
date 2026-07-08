@@ -89,6 +89,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!result.success) {
       return res.status(400).json({ error: result.error });
     }
+    // Uniqueness: floor names must be unique
+    const existingFloors = await st.getFloors();
+    if (existingFloors.some(f => f.name.trim().toLowerCase() === result.data.name.trim().toLowerCase())) {
+      return res.status(409).json({ error: "A floor with this name already exists" });
+    }
     const floor = await st.createFloor(result.data);
     broadcastUpdate("floor_created", floor);
     res.json(floor);
@@ -96,6 +101,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/floors/:id", requireAuth, async (req, res) => {
     const st = getStorage(req);
+    // Uniqueness: if renaming, check no other floor has the same name
+    if (req.body.name !== undefined) {
+      if (typeof req.body.name !== "string") {
+        return res.status(400).json({ error: "Floor name must be a string" });
+      }
+      const trimmedName = req.body.name.trim();
+      if (!trimmedName) {
+        return res.status(400).json({ error: "Floor name cannot be empty" });
+      }
+      const existingFloors = await st.getFloors();
+      const conflict = existingFloors.find(
+        f => f.id !== req.params.id && f.name.trim().toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (conflict) {
+        return res.status(409).json({ error: "A floor with this name already exists" });
+      }
+    }
     const floor = await st.updateFloor(req.params.id, req.body);
     if (!floor) {
       return res.status(404).json({ error: "Floor not found" });
@@ -135,6 +157,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!result.success) {
       return res.status(400).json({ error: result.error });
     }
+    // Uniqueness: table numbers must be unique within the same floor
+    const existingTables = await st.getTables();
+    const floorId = result.data.floorId ?? null;
+    const conflict = existingTables.find(
+      t => t.floorId === floorId &&
+           t.tableNumber.trim().toLowerCase() === result.data.tableNumber.trim().toLowerCase()
+    );
+    if (conflict) {
+      return res.status(409).json({ error: "A table with this name already exists on this floor" });
+    }
     const table = await st.createTable(result.data);
     broadcastUpdate("table_created", table);
     res.json(table);
@@ -142,6 +174,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/tables/:id", requireAuth, async (req, res) => {
     const st = getStorage(req);
+    // Validate string fields before trim
+    if (req.body.tableNumber !== undefined && typeof req.body.tableNumber !== "string") {
+      return res.status(400).json({ error: "Table number must be a string" });
+    }
+    // Uniqueness: if renaming or moving floor, check for conflicts
+    if (req.body.tableNumber !== undefined || req.body.floorId !== undefined) {
+      const currentTable = await st.getTable(req.params.id);
+      if (currentTable) {
+        const existingTables = await st.getTables();
+        const floorId = req.body.floorId !== undefined ? req.body.floorId : currentTable.floorId;
+        const tableNumber = (req.body.tableNumber !== undefined ? req.body.tableNumber : currentTable.tableNumber).trim();
+        if (!tableNumber) {
+          return res.status(400).json({ error: "Table number cannot be empty" });
+        }
+        const conflict = existingTables.find(
+          t => t.id !== req.params.id &&
+               t.floorId === floorId &&
+               t.tableNumber.trim().toLowerCase() === tableNumber.toLowerCase()
+        );
+        if (conflict) {
+          return res.status(409).json({ error: "A table with this name already exists on this floor" });
+        }
+      }
+    }
     const table = await st.updateTable(req.params.id, req.body);
     if (!table) {
       return res.status(404).json({ error: "Table not found" });

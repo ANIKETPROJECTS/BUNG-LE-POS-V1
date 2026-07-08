@@ -422,27 +422,21 @@ export default function TablesPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem 
-                  onClick={() => setShowAddFloorDialog(true)}
+                  onClick={() => navigate("/table-management")}
                   data-testid="menu-add-floor"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Floor
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => {
-                    setSelectedFloorId(floors.length > 0 ? floors[0].id : "");
-                    setShowAddTableDialog(true);
-                  }}
+                  onClick={() => navigate("/table-management")}
                   data-testid="menu-add-table"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Table
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => {
-                    setEditMode("floors");
-                    setShowEditDialog(true);
-                  }}
+                  onClick={() => navigate("/table-management")}
                   data-testid="menu-edit"
                 >
                   <Edit className="h-4 w-4 mr-2" />

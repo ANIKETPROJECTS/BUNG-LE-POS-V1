@@ -16,6 +16,7 @@ import DbErrorPage from "@/pages/db-error";
 import DashboardPage from "@/pages/dashboard";
 import BillingPage from "@/pages/billing";
 import TablesPage from "@/pages/tables";
+import TableManagementPage from "@/pages/table-management";
 import KitchenPage from "@/pages/kitchen";
 import MenuPage from "@/pages/menu";
 import ReportsPage from "@/pages/reports";
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/">{() => <ProtectedRoute component={DashboardPage} />}</Route>
       <Route path="/billing">{() => <ProtectedRoute component={BillingPage} />}</Route>
       <Route path="/tables">{() => <ProtectedRoute component={TablesPage} />}</Route>
+      <Route path="/table-management">{() => <ProtectedRoute component={TableManagementPage} />}</Route>
       <Route path="/kitchen">{() => <ProtectedRoute component={KitchenPage} />}</Route>
       <Route path="/menu">{() => <ProtectedRoute component={MenuPage} />}</Route>
       <Route path="/reports">{() => <ProtectedRoute component={ReportsPage} />}</Route>
