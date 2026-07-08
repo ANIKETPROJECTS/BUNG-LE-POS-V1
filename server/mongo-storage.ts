@@ -1285,3 +1285,5 @@ export class MongoStorage implements IStorage {
     return updated ?? undefined;
   }
 }
+
+export const mongoStorage = new MongoStorage();

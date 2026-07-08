@@ -28,6 +28,7 @@
 import { MongoClient, Db } from "mongodb";
 import type { IStorage } from "./storage";
 import { dynamicMongoDB } from "./dynamic-mongodb";
+import { mongodb } from "./mongodb";
 
 const EXTERNAL_DB_NAME = "Orders";
 const EXTERNAL_COLL    = "orders";
@@ -86,25 +87,37 @@ export class ExternalOrdersSyncService {
    * Resolve which MongoDB URI to use for the external orders database.
    *
    * Priority:
-   *  1. "mongodb_uri" key in the restaurant's settings collection
-   *     (saved via Menu Management → ⋮ → Database URI in the POS UI).
-   *     This lives inside the restaurant's own dynamicMongoDB connection which
-   *     is established when any user logs in.
-   *  2. DIGITAL_MENU_MONGODB_URI env/secret (explicit Replit secret override).
-   *  3. MONGODB_URI env fallback (works when both apps share one Atlas cluster).
+   *  1. "mongodb_uri" key in the restaurant's settings collection,
+   *     read via any active dynamicMongoDB connection (available after login).
+   *  2. "mongodb_uri" key read directly from the primary MongoDB settings
+   *     collection — works on server startup before any user has logged in.
+   *  3. DIGITAL_MENU_MONGODB_URI env/secret (explicit Replit secret override).
+   *  4. Throws — MONGODB_URI is NOT used as a fallback here because it points
+   *     to the POS's own database, which is never the external orders database.
    */
   private async resolveUri(): Promise<{ uri: string; source: string }> {
+    // 1. Active dynamicMongoDB session (available after a user logs in)
     const settingUri = await dynamicMongoDB
       .getSettingFromAnyConnection("mongodb_uri")
       .catch(() => undefined);
+    if (settingUri) return { uri: settingUri, source: "POS Database URI setting (dynamic)" };
 
-    if (settingUri) return { uri: settingUri, source: "POS Database URI setting" };
+    // 2. Direct read from the primary MongoDB settings collection.
+    //    This is where the UI saves the URI, and it works even before login.
+    try {
+      const doc = await mongodb
+        .getCollection<{ key: string; value: string }>("settings")
+        .findOne({ key: "mongodb_uri" } as any);
+      if (doc?.value) return { uri: doc.value, source: "POS Database URI setting (primary DB)" };
+    } catch {
+      // primary DB not ready yet — fall through
+    }
+
+    // 3. Explicit env override
     if (process.env.DIGITAL_MENU_MONGODB_URI)
       return { uri: process.env.DIGITAL_MENU_MONGODB_URI, source: "DIGITAL_MENU_MONGODB_URI env" };
-    if (process.env.MONGODB_URI)
-      return { uri: process.env.MONGODB_URI, source: "MONGODB_URI (fallback)" };
 
-    throw new Error("No MongoDB URI available — set it via Menu Management → ⋮ → Database URI");
+    throw new Error("No external MongoDB URI configured — set it via Menu Management → ⋮ → Database URI");
   }
 
   private async connect(): Promise<void> {

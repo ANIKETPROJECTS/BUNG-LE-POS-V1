@@ -29,6 +29,7 @@ import { generateInvoicePDF } from "./utils/invoiceGenerator";
 import { generateKOTPDF } from "./utils/kotGenerator";
 import { DigitalMenuSyncService } from "./digital-menu-sync";
 import { ExternalOrdersSyncService } from "./external-orders-sync";
+import { mongoStorage } from "./mongo-storage";
 
 const orderActionSchema = z.object({
   print: z.boolean().optional().default(false),
@@ -2108,7 +2109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   digitalMenuSync.start(5000);
 
   // ── External Orders Sync (Orders DB → orders collection) ──────────────────
-  const externalOrdersSync = new ExternalOrdersSyncService(storage);
+  const externalOrdersSync = new ExternalOrdersSyncService(mongoStorage);
   externalOrdersSync.setBroadcastFunction(broadcastUpdate);
 
   app.get("/api/external-orders/status", requireAuth, async (_req, res) => {
